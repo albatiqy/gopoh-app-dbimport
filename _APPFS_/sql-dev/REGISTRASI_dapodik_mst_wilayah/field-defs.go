@@ -3,8 +3,8 @@ package main
 
 import (
 	"github.com/albatiqy/gopoh/contract/gen/driver"
-	"github.com/albatiqy/gopoh/pkg/lib/decimal"
 	"github.com/albatiqy/gopoh/pkg/lib/null"
+	"github.com/albatiqy/gopoh/pkg/lib/decimal"
 	"time"
 )
 

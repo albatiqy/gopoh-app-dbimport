@@ -2,15 +2,14 @@ package main
 
 import (
 	_ "embed"
-	"reflect"
-	// "fmt"
+	"fmt"
 	"path/filepath"
-	// "reflect"
+	"reflect"
 	"strings"
 	"time"
 	"unicode"
 
-	// "github.com/albatiqy/gopoh-app-dbimport/pkg/gendriver"
+	"github.com/albatiqy/gopoh-app-dbimport/pkg/gendriver"
 
 	"github.com/albatiqy/gopoh/contract/gen/driver"
 	"github.com/albatiqy/gopoh/contract/gen/util"
@@ -69,6 +68,10 @@ func (obj genDev) Generate(pathPrjDir string) {
 		valuesPlaceholders = make([]string, fieldsLen)
 		valuesArgs         = make([]string, fieldsLen)
 		valuesVars         = make([]string, fieldsLen)
+		strFieldsModel     = make([]string, fieldsLen)
+		fieldScansModel    = make([]string, fieldsLen)
+		tableCols          = make([]string, fieldsLen)
+		qTimeLocalModel    []string
 	)
 	newJsonKeyAttr := obj.KeyAttr
 	for attr, field := range obj.FieldDefs {
@@ -117,10 +120,16 @@ func (obj genDev) Generate(pathPrjDir string) {
 		fieldTypeStr := reflect.TypeOf(field.Type).Elem().String()
 		valuesArgs[field.Ordinal] = varName + " " + fieldTypeStr
 		switch field.Type.(type) {
+		/*
+			case *string, *int, *int8, *int16, *int32, *int64, *uint, *uint8, *uint16, *uint32, *uint64, *float32, *float64:
+				valuesVars[field.Ordinal] = varName
+		*/
 		case *string:
+			valuesVars[field.Ordinal] = "quoteString(" + varName + ")"
+		case *time.Time, *null.String, *null.Time, *null.Bool, *null.Int32, *null.Int64, *null.Float64, *decimal.Decimal, *decimal.NullDecimal:
+			valuesVars[field.Ordinal] = "quote(" + varName + ")"
+		default:
 			valuesVars[field.Ordinal] = varName
-		case *null.String:
-			
 		}
 
 		switch field.Type.(type) {
@@ -133,6 +142,20 @@ func (obj genDev) Generate(pathPrjDir string) {
 		default:
 			valuesPlaceholders[field.Ordinal] = `%s` // need quote
 		}
+
+		switch field.Type.(type) {
+		case *time.Time:
+			fieldScansModel[field.Ordinal] = "\t\t\t&record." + field.StructField + ", // warning from UTC result"
+			qTimeLocalModel = append(qTimeLocalModel, "// \trecord."+field.StructField+" = record."+field.StructField+".Local() // convert to local")
+		case *null.Time:
+			fieldScansModel[field.Ordinal] = "\t\t\t&record." + field.StructField + ", // warning from UTC result"
+			qTimeLocalModel = append(qTimeLocalModel, "// \trecord."+field.StructField+" = null.NewTime(record."+field.StructField+".Time.Local(), record."+field.StructField+".Valid) // convert to local")
+		default:
+			fieldScansModel[field.Ordinal] = "\t\t\t&record." + field.StructField + ","
+		}
+		strFieldsModel[field.Ordinal] = fmt.Sprintf("\t%[1]s %[2]s `json:\"%[3]s\"`", field.StructField, fieldTypeStr, field.JSON)
+
+		tableCols[field.Ordinal] = field.Col
 
 		obj.FieldDefs[attr] = field
 	}
@@ -147,18 +170,24 @@ func (obj genDev) Generate(pathPrjDir string) {
 		}
 	}
 
-	// genDriver := gendriver.Get(obj.DBDriver)
+	genDriver := gendriver.Get(obj.DBDriver)
 
 	tplData := map[string]string{
 		"imports":            strings.Join(imports, "\n"),
 		"genStructName":      genStructName,
+		"dbDriver":           obj.DBDriver,
 		"objectPackage":      obj.ObjectPackage,
 		"newJsonKeyAttr":     newJsonKeyAttr,
 		"valuesArgs":         strings.Join(valuesArgs, ", "),
 		"valuesPlaceholders": strings.Join(valuesPlaceholders, ","),
 		"valuesVars":         strings.Join(valuesVars, ", "),
+		"fieldScansModel":    strings.Join(fieldScansModel, "\n"),
+		"qTimeLocalModel":    strings.Join(qTimeLocalModel, "\n"),
+		"fieldsModel":        strings.Join(strFieldsModel, "\n"),
+		"quoteFuncTpl":       genDriver.QuoteFuncTpl(),
+		"insertValuesTpl":    genDriver.InsertValuesTpl(obj.TableName, tableCols),
+		"selectTpl":          genDriver.SelectTpl(obj.TableName, tableCols),
 	}
 
 	util.WriteTplFile(fnameOut, txtObjectGen, tplData)
-
 }

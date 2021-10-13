@@ -8,6 +8,9 @@ var LoadedEngines = make(map[string]Engine)
 
 type Engine interface {
 	ReadSchema(schemaName string, db *sql.DB) (*SchemaData, error)
+	QuoteFuncTpl() string
+	InsertValuesTpl(tableName string, cols []string) string
+	SelectTpl(tableName string, cols []string) string
 }
 
 func Get(driverName string) Engine {

@@ -122,6 +122,69 @@ func (d Engine) ReadSchema(schemaName string, db *sql.DB) (*gendriver.SchemaData
 	}, nil
 }
 
+func (d Engine) QuoteFuncTpl() string {
+	return `
+	quoteString := func(str string) string {
+		return strings.ReplaceAll(str, "'", "''")
+	}
+	quote := func(val interface{}) string {
+		switch val := val.(type) {
+		case time.Time:
+			return "'" + val.Format("2006-01-02 15:04:05") + "'"
+		case null.String:
+			if val.Valid {
+				return "'" + quoteString(val.String) + "'"
+			}
+			return "NULL"
+		case null.Time:
+			if val.Valid {
+				return "'" + val.Time.Format("2006-01-02 15:04:05") + "'"
+			}
+			return "NULL"
+		case null.Bool:
+			if val.Valid {
+				if val.Bool {
+					return "TRUE"
+				}
+				return "FALSE"
+			}
+			return "NULL"
+		case null.Int32:
+			if val.Valid {
+				return strconv.FormatInt(int64(val.Int32), 10)
+			}
+			return "NULL"
+		case null.Int64:
+			if val.Valid {
+				return strconv.FormatInt(val.Int64, 10)
+			}
+			return "NULL"
+		case null.Float64:
+			if val.Valid {
+				return strconv.FormatFloat(val.Float64, 'f', 10, 64) // precission?
+			}
+			return "NULL"
+		case decimal.Decimal:
+			return val.String()
+		case decimal.NullDecimal:
+			if val.Valid {
+				return val.Decimal.String()
+			}
+			return "NULL"
+		}
+		return "NULL"
+	}
+	`
+}
+
+func (d Engine) InsertValuesTpl(tableName string, cols []string) string {
+	return "INSERT INTO " + tableName + " (" + strings.Join(cols, ",") + ") VALUES %s"
+}
+
+func (d Engine) SelectTpl(tableName string, cols []string) string {
+	return "SELECT " + strings.Join(cols, ",") + " FROM " + tableName
+}
+
 func init() {
 	gendriver.LoadedEngines["postgres"] = Engine{}
 	log.Debugf("postgres gen: %s", "initialized")

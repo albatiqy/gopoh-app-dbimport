@@ -122,6 +122,18 @@ func (d Engine) ReadSchema(schemaName string, db *sql.DB) (*gendriver.SchemaData
 	}, nil
 }
 
+func (d Engine) QuoteFuncTpl() string {
+	return ""
+}
+
+func (d Engine) InsertValuesTpl(tableName string, cols []string) string {
+	return "INSERT INTO " + tableName + " (" + strings.Join(cols, ",") + ") VALUES %s"
+}
+
+func (d Engine) SelectTpl(tableName string, cols []string) string {
+	return "SELECT " + strings.Join(cols, ",") + " FROM " + tableName
+}
+
 func init() {
 	gendriver.LoadedEngines["sqlserver"] = Engine{}
 	log.Debugf("sqlserver gen: %s", "initialized")
