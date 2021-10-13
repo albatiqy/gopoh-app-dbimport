@@ -1,0 +1,14 @@
+package {{.objectPackage}}
+
+import (
+	"fmt"
+{{if ne .imports ""}}{{.imports}}{{end}}
+)
+
+type {{.genStructName}} struct {
+
+}
+
+func (gen {{.genStructName}}) Values({{.valuesArgs}}) string {
+	return fmt.Sprintf(`({{.valuesPlaceholders}})`, {{.valuesVars}})
+}

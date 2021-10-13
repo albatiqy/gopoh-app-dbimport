@@ -1,0 +1,6 @@
+*
+!_archive
+!log
+!.gitignore
+!webroot
+!sql-dev
