@@ -53,8 +53,8 @@ func (cmd *cmdMstWilayah) Run(args []string) int {
 			cmd.Ui.Error(err.Error())
 			return 1
 		}
-	case "dump":
-		mstWilayah.Dump(cmd.Ui)
+	case "import":
+		mstWilayah.Import(cmd.Ui)
 	default:
 		cmd.Ui.Error("Invalid operation.")
 		cmd.Ui.Error("")

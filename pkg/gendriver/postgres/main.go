@@ -4,10 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
+	"strconv"
 
 	"github.com/albatiqy/gopoh-app-dbimport/pkg/gendriver"
 	"github.com/albatiqy/gopoh/contract/log"
 	"github.com/albatiqy/gopoh/pkg/lib/null"
+	"github.com/albatiqy/gopoh/pkg/lib/decimal"
 )
 
 type rawField struct {
@@ -122,59 +125,60 @@ func (d Engine) ReadSchema(schemaName string, db *sql.DB) (*gendriver.SchemaData
 	}, nil
 }
 
-func (d Engine) QuoteFuncTpl() string {
-	return `
-	quoteString := func(str string) string {
-		return strings.ReplaceAll(str, "'", "''")
-	}
-	quote := func(val interface{}) string {
-		switch val := val.(type) {
-		case time.Time:
-			return "'" + val.Format("2006-01-02 15:04:05") + "'"
-		case null.String:
-			if val.Valid {
-				return "'" + quoteString(val.String) + "'"
+func (d Engine) QuoteString(val string) string {
+	return strings.ReplaceAll(val, "'", "''")
+}
+
+func (d Engine) Quote(val interface{}) string {
+	switch val := val.(type) {
+	case time.Time:
+		return "'" + val.Format("2006-01-02 15:04:05") + "'"
+	case null.String:
+		if val.Valid {
+			return "'" + d.QuoteString(val.String) + "'"
+		}
+		return "NULL"
+	case null.Time:
+		if val.Valid {
+			return "'" + val.Time.Format("2006-01-02 15:04:05") + "'"
+		}
+		return "NULL"
+	case null.Bool:
+		if val.Valid {
+			if val.Bool {
+				return "TRUE"
 			}
-			return "NULL"
-		case null.Time:
-			if val.Valid {
-				return "'" + val.Time.Format("2006-01-02 15:04:05") + "'"
-			}
-			return "NULL"
-		case null.Bool:
-			if val.Valid {
-				if val.Bool {
-					return "TRUE"
-				}
-				return "FALSE"
-			}
-			return "NULL"
-		case null.Int32:
-			if val.Valid {
-				return strconv.FormatInt(int64(val.Int32), 10)
-			}
-			return "NULL"
-		case null.Int64:
-			if val.Valid {
-				return strconv.FormatInt(val.Int64, 10)
-			}
-			return "NULL"
-		case null.Float64:
-			if val.Valid {
-				return strconv.FormatFloat(val.Float64, 'f', 10, 64) // precission?
-			}
-			return "NULL"
-		case decimal.Decimal:
-			return val.String()
-		case decimal.NullDecimal:
-			if val.Valid {
-				return val.Decimal.String()
-			}
-			return "NULL"
+			return "FALSE"
+		}
+		return "NULL"
+	case null.Int32:
+		if val.Valid {
+			return strconv.FormatInt(int64(val.Int32), 10)
+		}
+		return "NULL"
+	case null.Int64:
+		if val.Valid {
+			return strconv.FormatInt(val.Int64, 10)
+		}
+		return "NULL"
+	case null.Float64:
+		if val.Valid {
+			return strconv.FormatFloat(val.Float64, 'f', 10, 64) // precission?
+		}
+		return "NULL"
+	case decimal.Decimal:
+		return val.String()
+	case decimal.NullDecimal:
+		if val.Valid {
+			return val.Decimal.String()
 		}
 		return "NULL"
 	}
-	`
+	return "NULL"
+}
+
+func (d Engine) CreateTable(tableName string, schemaData *gendriver.SchemaData) string {
+	return ""
 }
 
 func (d Engine) InsertValuesTpl(tableName string, cols []string) string {
@@ -183,6 +187,23 @@ func (d Engine) InsertValuesTpl(tableName string, cols []string) string {
 
 func (d Engine) SelectTpl(tableName string, cols []string) string {
 	return "SELECT " + strings.Join(cols, ",") + " FROM " + tableName
+}
+
+func (d Engine) InsertPlaceholders(fieldType []interface{}) string {
+	result := make([]string, len(fieldType))
+	for i, t := range fieldType {
+		switch t.(type) {
+		case *int, *int8, *int16, *int32, *int64, *uint, *uint8, *uint16, *uint32, *uint64:
+			result[i] = `%d`
+		case *float32, *float64:
+			result[i] = `%f`
+		case *string:
+			result[i] = `'%s'`
+		default:
+			result[i] = `%s` // need quote
+		}
+	}
+	return strings.Join(result, ",")
 }
 
 func init() {

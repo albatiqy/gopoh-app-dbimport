@@ -8,9 +8,16 @@ var LoadedEngines = make(map[string]Engine)
 
 type Engine interface {
 	ReadSchema(schemaName string, db *sql.DB) (*SchemaData, error)
-	QuoteFuncTpl() string
+	QuoteString(val string) string
+	Quote(val interface{}) string
+	CreateTable(tableName string, schemaData *SchemaData) string
 	InsertValuesTpl(tableName string, cols []string) string
 	SelectTpl(tableName string, cols []string) string
+	InsertPlaceholders(fieldType []interface{}) string
+}
+
+type GoTypeCompatible interface {
+	GoType() interface{}
 }
 
 func Get(driverName string) Engine {
@@ -23,7 +30,6 @@ func Get(driverName string) Engine {
 
 type ColData struct {
 	Name             string
-	CompatibleGoType interface{}
 	Type             interface{}
 	Nullable         bool
 }
@@ -33,12 +39,38 @@ type SchemaData struct {
 }
 
 type TChar struct {
+	compatibleGoType interface{}
+	MaximumLength int32
+}
+
+func (t TChar) GoType() interface{} {
+	return t.compatibleGoType
+}
+
+func NewTChar(len int32) TChar {
+	return TChar{
+		compatibleGoType: (*string)(nil),
+		MaximumLength: len,
+	}
 }
 
 type TText struct {
 }
 
 type TVarChar struct {
+	compatibleGoType interface{}
+	MaximumLength int32
+}
+
+func (t TVarChar) GoType() interface{} {
+	return t.compatibleGoType
+}
+
+func NewTVarChar(len int32) TChar {
+	return TChar{
+		compatibleGoType: (*string)(nil),
+		MaximumLength: len,
+	}
 }
 
 type TCharUnicode struct {

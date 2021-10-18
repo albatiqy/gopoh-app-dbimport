@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/cli"
 
 	"github.com/albatiqy/gopoh-app-dbimport/internal/sqlgen"
+	"github.com/albatiqy/gopoh-app-dbimport/pkg/gendriver"
 	"github.com/albatiqy/gopoh/contract/repository/sqldb"
 
 	"github.com/albatiqy/gopoh/pkg/lib/decimal"
@@ -43,13 +44,16 @@ type MstWilayah struct {
 	sqlGen           *sqlgen.RegistrasiDapodikMstWilayah
 	srcSqlserverConn *sqldb.Conn
 	dstPostgresConn  *sqldb.Conn
+	genDriver        gendriver.Engine
 }
 
 func NewMstWilayah(srcSqlserverConn, dstPostgresConn *sqldb.Conn) *MstWilayah {
+	genDriver := gendriver.Get("postgres")
 	return &MstWilayah{
-		sqlGen:           sqlgen.NewRegistrasiDapodikMstWilayah(),
+		sqlGen:           sqlgen.NewRegistrasiDapodikMstWilayah(genDriver),
 		srcSqlserverConn: srcSqlserverConn,
 		dstPostgresConn:  dstPostgresConn,
+		genDriver:        genDriver,
 	}
 }
 
@@ -57,7 +61,7 @@ func (dbo MstWilayah) CreateTable() error {
 	return nil
 }
 
-func (dbo MstWilayah) Dump(ui cli.Ui) {
+func (dbo MstWilayah) Import(ui cli.Ui) {
 	strInsert := "INSERT INTO dapodik_mst_wilayah (kode_wilayah,nama,id_level_wilayah,mst_kode_wilayah,negara_id,asal_wilayah,kode_bps,kode_dagri,kode_keu,id_prov,id_kabkota,id_kec,a_desa,a_kelurahan,a_35,a_urban,kategori_desa_id,expired_date,synced_at) VALUES %s"
 
 	rows, err := dbo.srcSqlserverConn.DB.Query(
@@ -107,13 +111,15 @@ func (dbo MstWilayah) Dump(ui cli.Ui) {
 			return
 		}
 
-		record.LastUpdate = record.LastUpdate.Local()                                                // convert to local
-		record.CreateDate = record.CreateDate.Local()                                                // convert to local
-		record.ExpiredDate = null.NewTime(record.ExpiredDate.Time.Local(), record.ExpiredDate.Valid) // convert to local
-		record.LastSync = record.LastSync.Local()                                                    // convert to local
+		/*
+			record.LastUpdate = record.LastUpdate.Local()                                                // convert to local
+			record.CreateDate = record.CreateDate.Local()                                                // convert to local
+			record.ExpiredDate = null.NewTime(record.ExpiredDate.Time.Local(), record.ExpiredDate.Valid) // convert to local
+			record.LastSync = record.LastSync.Local()                                                    // convert to local
+		*/
 
 		kategoriDesaId := null.NewInt32(int32(record.KategoriDesaId.Decimal.IntPart()), record.KategoriDesaId.Valid)
-		
+
 		bbResult.WriteString(
 			dbo.sqlGen.Values(
 				record.KodeWilayah,
